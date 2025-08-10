@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { redirectHook, errorHook } from './hooks.server';
+import { handle, redirectHook, errorHook } from './hooks.server';
 import { mockHandleParams } from '$lib/mocks/request';
 
 describe('hooks', () => {
+  describe('handle', () => {
+    it('resolves', async () => {
+      let { event, resolve } = mockHandleParams();
+      await handle({ event, resolve });
+      expect(resolve).toHaveBeenCalled;
+    });
+  });
+
   describe('redirectHook', () => {
     it('redirects', async () => {
       let { event, resolve } = mockHandleParams();

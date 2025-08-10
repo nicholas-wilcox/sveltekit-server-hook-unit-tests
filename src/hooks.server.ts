@@ -5,6 +5,12 @@
 import type { Handle } from '@sveltejs/kit';
 import { redirect, error } from '@sveltejs/kit';
 
+// This is the same as SvelteKit's default implementation, but I am
+// repeating it here for demonstration and testing purposes.
+export const handle = (async ({ event, resolve }) => {
+  return resolve(event);
+}) satisfies Handle;
+
 export const redirectHook = (async ({ event, resolve }) => {
   redirect(302, '/login');
 }) satisfies Handle;
