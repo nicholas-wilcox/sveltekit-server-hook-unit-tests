@@ -1,5 +1,5 @@
 {
-  "name": "sveltekit-throw-unit-tests",
+  "name": "sveltekit-server-hook-unit-tests",
   "private": true,
   "version": "0.0.1",
   "type": "module",
