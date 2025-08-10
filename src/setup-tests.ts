@@ -4,13 +4,13 @@
  */
 import { isHttpError, isRedirect, type HttpError, type Redirect } from '@sveltejs/kit';
 import { expect } from 'vitest';
-import type { MatcherState } from '@vitest/expect';
+import type { MatcherState, ExpectationResult } from '@vitest/expect';
 
 function toThrowRedirect<T extends MatcherState = MatcherState>(
   this: T,
   actual: unknown,
   expected?: { status?: Redirect['status']; location?: Redirect['location'] }
-) {
+): ExpectationResult {
   const { isNot, equals } = this;
 
   const isActualRedirect = isRedirect(actual);
@@ -49,7 +49,7 @@ function toThrowHttpError<T extends MatcherState = MatcherState>(
   this: T,
   actual: unknown,
   expected?: { status?: HttpError['status']; message?: HttpError['body']['message'] }
-) {
+): ExpectationResult {
   const { isNot, equals } = this;
 
   const isActualHttpError = isHttpError(actual);
