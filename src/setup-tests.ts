@@ -11,7 +11,7 @@ function toThrowRedirect<T extends MatcherState = MatcherState>(
   actual: unknown,
   expected?: { status?: Redirect['status']; location?: Redirect['location'] }
 ) {
-  const { isNot } = this;
+  const { isNot, equals } = this;
 
   const isActualRedirect = isRedirect(actual);
   if (!isActualRedirect) {
@@ -21,7 +21,7 @@ function toThrowRedirect<T extends MatcherState = MatcherState>(
     };
   }
 
-  if (expected?.status && actual.status !== expected.status) {
+  if (expected?.status && !equals(actual.status, expected.status)) {
     return {
       pass: false,
       message: () => 'Status code mismatch',
@@ -30,7 +30,7 @@ function toThrowRedirect<T extends MatcherState = MatcherState>(
     };
   }
 
-  if (expected?.location && actual.location !== expected.location) {
+  if (expected?.location && !equals(actual.location, expected.location)) {
     return {
       pass: false,
       message: () => 'Location mismatch',
@@ -50,7 +50,7 @@ function toThrowHttpError<T extends MatcherState = MatcherState>(
   actual: unknown,
   expected?: { status?: HttpError['status']; message?: HttpError['body']['message'] }
 ) {
-  const { isNot } = this;
+  const { isNot, equals } = this;
 
   const isActualHttpError = isHttpError(actual);
   if (!isActualHttpError) {
@@ -60,7 +60,7 @@ function toThrowHttpError<T extends MatcherState = MatcherState>(
     };
   }
 
-  if (expected?.status && actual.status !== expected.status) {
+  if (expected?.status && !equals(actual.status, expected.status)) {
     return {
       pass: false,
       message: () => 'Status code mismatch',
@@ -69,7 +69,7 @@ function toThrowHttpError<T extends MatcherState = MatcherState>(
     };
   }
 
-  if (expected?.message && actual.body.message !== expected.message) {
+  if (expected?.message && !equals(actual.body.message, expected.message)) {
     return {
       pass: false,
       message: () => 'Message mismatch',
