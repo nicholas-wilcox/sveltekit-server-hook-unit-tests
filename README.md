@@ -56,7 +56,7 @@ export function mockRequestEvent(): RequestEvent {
   return {
     cookies: mockCookies(),
     fetch: vi.fn()
-    // ... other fields and methods omitted
+    // ...other fields and methods omitted
   };
 }
 
@@ -102,7 +102,7 @@ At this point, you could also create other tests around behavior like setting co
 ### Custom Matchers for Redirects and Errors
 
 SvelteKit's `redirect` and `error` functions throw exceptions, but they throw specific `Redirect` and `HttpError` objects instead of `Error`s.
-Therefore, we must create custom matchers using the helper functions to detect these objects. Below is a summary of how this is acheived for redirects.
+Therefore, we must create custom matchers using the helper functions to detect these objects. Below is a summary of how this is achieved for redirects.
 The process for HTTP errors is similar.
 
 ```ts
@@ -239,3 +239,26 @@ describe('redirectHook', () => {
   });
 });
 ```
+
+#### A Note on Types
+
+In the fine-grained `toThrowRedirect()` function, TypeScript recognizes that `actual`
+has the `Redirect` type when it checks the `status` and `location` fields.
+This is because the return type of SvelteKit's `isRedirect()` function ([source link](https://github.com/sveltejs/kit/blob/6275ef3376789ddeccac038165260d98513fa0c0/packages/kit/src/exports/index.js#L124))
+is actually a [_type predicate_](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates).
+
+Because we return early when `isRedirect(actual)` is `false`, TypeScript assumes that `actual`
+has the `Redirect` type in the code below, which only runs when `isRedirect(actual)` returns `true`.
+The `isHttpError()` function similarly returns a type predicate related to the `HttpError` type.
+
+## Next Steps and Disclaimers
+
+While I hope you find this code useful, I believe it is best used as a starting point for you to customize for your own needs.
+A realistic application will have specific behavior that is contingent on the `event` object's data, like its route ID.
+You will likely want to modify the mock utility library to easily create mock events that represent the scenarios you want to test.
+
+I should also note that there is no inherent link between server hooks and SvelteKit's `redirect()` and `error()` functions.
+These functions can be used in other places like server load functions, and so the custom matchers shown here can be used to perform unit tests on that code as well.
+
+Additionally, I have omitted SvelteKit's `fail` function from this demo, but the same principles
+should apply if you wish to create unit tests around expected errors in your form actions.
