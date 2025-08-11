@@ -116,7 +116,7 @@ export const redirectHook = (async ({ event, resolve }) => {
 }) satisfies Handle;
 ```
 
-In [a comment](https://github.com/sveltejs/kit/issues/10062#issuecomment-3172921484) on my original GitHub issue, user @rebasecase suggested combining SvelteKit's `isRedirect()` and `isHttpError()` functions with Vitest's builtin `toSatisfy()` assertion. We can use the following test to confirm that the redirect is thrown:
+In [a comment](https://github.com/sveltejs/kit/issues/10062#issuecomment-3172921484) on my original GitHub issue, user [@rebasecase](https://github.com/rebasecase) suggested combining SvelteKit's `isRedirect()` and `isHttpError()` functions with Vitest's builtin `toSatisfy()` assertion. We can use the following test to confirm that the redirect is thrown:
 
 ```ts
 // src/hooks.server.test.ts
@@ -250,7 +250,7 @@ I hope you find this code useful enough for to customize for your own needs.
 A realistic application will have specific behavior that is contingent on the `event` object's data, like its route ID.
 You will likely want to modify the mock utility library to easily create mock events that represent the scenarios you want to test.
 
-I should also note that there is no inherent link between server hooks and SvelteKit's `redirect()` and `error()` functions.
+To reiterate a point made earlier, there is no inherent link between server hooks and SvelteKit's `redirect()` and `error()` functions.
 These functions can be used in other places like server load functions, and so the custom matchers shown here can be used to perform unit tests on that code as well.
 
 Additionally, I have omitted SvelteKit's `fail` function from this demo, but the same principles
