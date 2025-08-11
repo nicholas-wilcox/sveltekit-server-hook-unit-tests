@@ -1,6 +1,6 @@
 # SvelteKit Server Hook Unit Test Demo
 
-This repository contains a demonstration of how you can write unit tests for [SvelteKit server hooks](https://svelte.dev/docs/kit/hooks#Server-hooks).
+This repository contains a demonstration of how you can write unit tests for [SvelteKit server hooks](https://svelte.dev/docs/kit/hooks#Server-hooks). It focuses on testing `Redirect` and `HttpError` objects thrown by SvelteKit's utility functions, which is also useful when unit testing server load functions.
 
 ## Motivation
 
@@ -99,41 +99,12 @@ describe('handle', () => {
 
 At this point, you could also create other tests around behavior like setting cookies or response headers.
 
-### Custom Matchers for Redirects and Errors
+### Testing Redirects and Errors
 
 SvelteKit's `redirect` and `error` functions throw exceptions, but they throw specific `Redirect` and `HttpError` objects instead of `Error`s.
-Therefore, we must create custom matchers using the helper functions to detect these objects. Below is a summary of how this is achieved for redirects.
-The process for HTTP errors is similar.
+Therefore, we must use the [`rejects`](https://vitest.dev/api/expect.html#rejects) property to access the thrown object.
 
-```ts
-// src/setup-tests.ts
-import { isRedirect, type Redirect } from '@sveltejs/kit';
-import { expect } from 'vitest';
-import type { MatcherState, ExpectationResult } from '@vitest/expect';
-
-function toThrowRedirect<T extends MatcherState = MatcherState>(
-  this: T,
-  actual: unknown
-): ExpectationResult {
-  const { isNot } = this;
-
-  return {
-    pass: isRedirect(actual),
-    message: () => `Expected a redirect to ${isNot ? 'not ' : ''}be thrown`
-  };
-}
-
-expect.extend({ toThrowRedirect });
-```
-
-Some notes:
-
-- The typing for `this` is necessary because I prefer to declare the function at the top level and then provide it to `expect.extend()` below.
-  I used the same typing that Vitest uses for [its `RawMatcherFn` interface](https://github.com/vitest-dev/vitest/blob/cd5c19dec1603a8bdfc4f6735bd518304cce816c/packages/expect/src/types.ts#L89).
-- Because I've defined the custom matcher in a separate `src/setup-tests.ts` file, it must be configured as a [setup file](https://vitest.dev/config/#setupfiles) in the project's config.
-- The `toThrowRedirect()` matcher function should be added to Vitest's `Assertion` interface using an ambient TypeScript declaration file. See [Vitest's documentation](https://vitest.dev/guide/extending-matchers.html) for more information.
-
-Now we can create a redirect hook with a unit test.
+Suppose we have the following redirect hook:
 
 ```ts
 // src/hooks.server.ts
@@ -145,24 +116,44 @@ export const redirectHook = (async ({ event, resolve }) => {
 }) satisfies Handle;
 ```
 
+In [a comment](https://github.com/sveltejs/kit/issues/10062#issuecomment-3172921484) on my original GitHub issue, user @rebasecase suggested combining SvelteKit's `isRedirect()` and `isHttpError()` functions with Vitest's builtin `toSatisfy()` assertion. We can use the following test to confirm that the redirect is thrown:
+
 ```ts
 // src/hooks.server.test.ts
 import { describe, expect, it } from 'vitest';
+import { isRedirect } from '@sveltejs/kit';
 import { redirectHook } from './hooks.server';
 import { mockHandleParams } from '$lib/mocks/request';
 
 describe('redirectHook', () => {
   it('redirects', async () => {
     let { event, resolve } = mockHandleParams();
-    await expect(redirectHook({ event, resolve })).rejects.toThrowRedirect();
+    await expect(redirectHook({ event, resolve })).rejects.toSatisfy(isRedirect);
   });
 });
 ```
 
-#### Fine-grained Redirect Assertions
+We can also pass our own function that accepts the thrown value as an argument to perform other checks.
 
-What if we want to make assertions about the status code and the location of the redirect?
-This can be done by enhancing our custom matcher with some optional expected values.
+```ts
+it('redirects to the login page', async () => {
+  let { event, resolve } = mockHandleParams();
+  await expect(redirectHook({ event, resolve })).rejects.toSatisfy((e) => {
+    return isRedirect(e) && e.location === '/login';
+  });
+});
+```
+
+This approach will let you test any criteria you want, but it comes with some caveats:
+
+1. It is a potential source of code duplication.
+2. Consequently, your tests may develop subtle differences in how they inspect data.
+3. The reporting for a failed test is not granular.
+
+### Custom Matchers
+
+We can create our own assertion functions, or "matchers", that abstract the process of calling `isRedirect()`
+while integrating with Vitest's reporting functionality.
 
 ```ts
 // src/setup-tests.ts
@@ -208,14 +199,20 @@ function toThrowRedirect<T extends MatcherState = MatcherState>(
     message: () => `Expected a redirect to ${isNot ? 'not ' : ''}be thrown`
   };
 }
+
+expect.extend({ toThrowRedirect });
 ```
 
-This is arguably unnecessary, but I chose to use the [`equals()`](https://vitest.dev/guide/extending-matchers.html#equals)
-function provide by `this` instead of doing my own equality checks.
-You may wish to modify this code for your own purposes. For instance, when checking the message of HTTP errors,
-you may want to check that the message _contains_ an expected string rather than check for equality.
+Some notes:
 
-In any case, we can now write tests that check the location of a redirect.
+- The typing for `this` is necessary because I prefer to declare the function at the top level and then provide it to `expect.extend()` below.
+  I used the same typing that Vitest uses for [its `RawMatcherFn` interface](https://github.com/vitest-dev/vitest/blob/cd5c19dec1603a8bdfc4f6735bd518304cce816c/packages/expect/src/types.ts#L89).
+- I chose to use the [`equals()`](https://vitest.dev/guide/extending-matchers.html#equals) function provide by `this` instead of doing my own equality checks.
+  You may wish to modify this code to fit your preferences.
+- Because I've defined the custom matcher in a separate `src/setup-tests.ts` file, it must be configured as a [setup file](https://vitest.dev/config/#setupfiles) in the project's config.
+- The `toThrowRedirect()` matcher function should be added to Vitest's `Assertion` interface using an ambient TypeScript declaration file. See [Vitest's documentation](https://vitest.dev/guide/extending-matchers.html) for more information.
+
+Now we can rewrite the previous redirect tests using a `toThrowRedirect()` function.
 
 ```ts
 // src/hooks.server.test.ts
@@ -224,25 +221,21 @@ import { redirectHook } from './hooks.server';
 import { mockHandleParams } from '$lib/mocks/request';
 
 describe('redirectHook', () => {
-  it('returns a 302 status', async () => {
+  it('redirects', async () => {
     let { event, resolve } = mockHandleParams();
-    await expect(redirectHook({ event, resolve })).rejects.toThrowRedirect({
-      status: 302
-    });
+    await expect(redirectHook({ event, resolve })).rejects.toThrowRedirect();
   });
 
-  it('redirects to the login route', async () => {
+  it('redirects to the login page', async () => {
     let { event, resolve } = mockHandleParams();
-    await expect(redirectHook({ event, resolve })).rejects.toThrowRedirect({
-      location: '/login'
-    });
+    await expect(redirectHook({ event, resolve })).rejects.toThrowRedirect({ location: '/login' });
   });
 });
 ```
 
-#### A Note on Types
+### A Note on Types
 
-In the fine-grained `toThrowRedirect()` function, TypeScript recognizes that `actual`
+TypeScript can (sometimes) recognize that `actual`
 has the `Redirect` type when it checks the `status` and `location` fields.
 This is because the return type of SvelteKit's `isRedirect()` function ([source link](https://github.com/sveltejs/kit/blob/6275ef3376789ddeccac038165260d98513fa0c0/packages/kit/src/exports/index.js#L124))
 is actually a [_type predicate_](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates).
@@ -253,7 +246,7 @@ The `isHttpError()` function similarly returns a type predicate related to the `
 
 ## Next Steps and Disclaimers
 
-While I hope you find this code useful, I believe it is best used as a starting point for you to customize for your own needs.
+I hope you find this code useful enough for to customize for your own needs.
 A realistic application will have specific behavior that is contingent on the `event` object's data, like its route ID.
 You will likely want to modify the mock utility library to easily create mock events that represent the scenarios you want to test.
 
